@@ -2,28 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSheet, getProspectsToProcess, updateProspectStatus } from '@/lib/googleSheets';
 import { generateEmailContent } from '@/lib/gemini';
 import { sendEmail } from '@/lib/emailService';
-
-// --- Nouvelle fonction de recherche de prospects (Hunter.io) ---
-const HUNTER_API_KEY = process.env.HUNTER_API_KEY;
-const HUNTER_DOMAIN_SEARCH_URL = 'https://api.hunter.io/v2/domain-search';
-
-async function findProspects(domain) {
-  const url = `${HUNTER_DOMAIN_SEARCH_URL}?domain=${encodeURIComponent(domain)}&api_key=${HUNTER_API_KEY}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err = await res.json();
-    console.error('Erreur Hunter :', err);
-    throw new Error(err?.errors?.[0]?.details || 'Échec recherche Hunter');
-  }
-  const data = await res.json();
-  return data.data.emails
-    .filter(e => e.verification && e.verification.status === 'valid')
-    .map(e => ({
-      email: e.value,
-      nom: `${e.first_name} ${e.last_name}`,
-      entreprise: data.data.organization || domain,
-    }));
-}
+import { findProspects } from '@/lib/prospects';
 
 // --- Nouvelle version de la route CRON ---
 export async function GET(request) {
@@ -40,7 +19,7 @@ export async function GET(request) {
     // ========================================================
     console.log('Recherche de nouveaux prospects...');
     // Liste des domaines à cibler (à personnaliser !)
-    const domainesACibler = ['totalenergies.cg', 'snpc-group.com','tridentenergy.com','mtn.cg','airtel.cg','alink-telecom.com','intercon-congo.com','bgfibank.com','banquepostale-congo.com','ecobank.com','societegenerale.cg','bci.cg','bdeac.org','bouygues-es.com','cmec.com','odellya.cg','siliconeconnect.com','cowema.org','lobservatoire242.cg','soromholding.cg',' emploi.cg'];
+    const domainesACibler = ['totalenergies.cg', 'snpc-group.com','tridentenergy.com','mtn.cg','airtel.cg','alink-telecom.com','intercon-congo.com','bgfibank.com','banquepostale-congo.com','ecobank.com','societegenerale.cg','bci.cg','bdeac.org','bouygues-es.com','cmec.com','odellya.cg','siliconeconnect.com','cowema.org','lobservatoire242.cg','soromholding.cg','emploi.cg'];
 
     let nouveauxProspects = [];
     for (const domain of domainesACibler) {
@@ -65,6 +44,7 @@ export async function GET(request) {
             email: p.email,
             nom: p.nom,
             entreprise: p.entreprise,
+            poste: p.poste,
             statut: 'à envoyer',
           });
           console.log(`Ajouté : ${p.email}`);
